@@ -46,100 +46,50 @@ func main() {
 		check(err)
 	}
 
-	//fmt.Println(prettyPrint(uploadedFiles))
-
-	//os.Exit(1)
-
 	uploadedFiles, err := readSuccessedFromFile()
-	if err != nil {
-		check(err)
-	}
+	check(err)
 
 	out := os.Stdout
-	//fmt.Printf("%T\n", out)
-
-	printFiles := true
 
 	// перед проходом по директории, восстановим мапу с файла
+	err = dirTree(out, path, uploadedFiles, &limit, step)
+	check(err)
 
-	err = dirTree(out, path, printFiles, uploadedFiles, &limit, step)
-	if err != nil {
-		check(err)
-	}
 }
 
-func dirTree(out io.Writer, path string, printFiles bool, uploadedFiles map[string]string, limit *int, step int) error {
-	pathAbs, _ := filepath.Abs(path)
-	recDirTree(out, pathAbs, printFiles, 0, "", uploadedFiles, limit, step)
+func dirTree(out io.Writer, path string, uploadedFiles map[string]string, limit *int, step int) error {
+	pathAbs, err := filepath.Abs(path)
+	check(err)
+	recDirTree(out, pathAbs, 0, uploadedFiles, limit, step)
 	return nil
 }
 
-func recDirTree(out io.Writer, path string, printFiles bool, lvl int, sep string, uploadedFiles map[string]string, limit *int, step int) {
-	//pathAbs, _ := filepath.Abs(path)
+func recDirTree(out io.Writer, path string, lvl int, uploadedFiles map[string]string, limit *int, step int) {
 
-	var sepNew string // под уровень
-	//var sepRow string // под итоговую строку
-	//var sepCur string
 	var size int64
-	//var sizeStr string
 	var pathList []string
-	var pathListResult []string
 	var pathListErr error
 	var availableExt = []string{".png", ".JPG", ".jpg"}
 
 	lvl++
-	//hPath, _ := os.Open(pathAbs)
 	hPath, _ := os.Open(path)
 	fInfo, _ := hPath.Stat()
 	if fInfo.IsDir() {
 		pathList, pathListErr = hPath.Readdirnames(1000)
-		if pathListErr != nil {
-			check(pathListErr)
-		}
-		sort.Strings(pathList)
+		check(pathListErr)
 
-		// показать / не показать файлы
-		if !printFiles {
-			// скроем файлы
-			for indexTmp := range pathList {
-				hPathFileTmp, _ := os.Open(filepath.Join(path, pathList[indexTmp]))
-				fInfoFileTmp, _ := hPathFileTmp.Stat()
-				if fInfoFileTmp.IsDir() {
-					pathListResult = append(pathListResult, pathList[indexTmp])
-				}
-			}
-			pathList = pathListResult
-		}
+		sort.Strings(pathList)
 	}
 
-	lenList := len(pathList)
 	for index := range pathList {
-		//sepCur = ""
-		if lvl > 1 {
-			//sepCur = sep
-		}
-
-		if lenList == index+1 {
-			//sepRow = sepCur + "└───"
-		} else {
-			//sepRow = sepCur + "├───"
-		}
-
-		if lenList == index+1 {
-			sepNew = sep + "\t"
-		} else {
-			sepNew = sep + "│\t"
-		}
 
 		absolutePath := filepath.Join(path, pathList[index])
 		hPathFile, _ := os.Open(absolutePath)
 		fInfoFile, _ := hPathFile.Stat()
 
-		//sizeStr = ""
 		if !fInfoFile.IsDir() {
 			size = fInfoFile.Size()
 			if size > 0 {
-				//sizeStr = " (" + strconv.FormatInt(size, 10) + "b)"
 
 				// проверяем расширение файла
 				if isContains(availableExt, filepath.Ext(pathList[index])) {
@@ -173,7 +123,7 @@ func recDirTree(out io.Writer, path string, printFiles bool, lvl int, sep string
 		}
 		//fmt.Fprintln(out, sepRow+pathList[index]+sizeStr)
 		if fInfo.IsDir() {
-			recDirTree(out, filepath.Join(path, pathList[index]), printFiles, lvl, sepNew, uploadedFiles, limit, step)
+			recDirTree(out, filepath.Join(path, pathList[index]), lvl, uploadedFiles, limit, step)
 		}
 	}
 
