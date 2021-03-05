@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"sort"
 	"strconv"
@@ -15,6 +16,8 @@ import (
 
 	// "io"
 	"path/filepath"
+
+	"github.com/pkg/errors"
 )
 
 var (
@@ -29,6 +32,7 @@ var (
 	step          int
 )
 
+// вызов go run main.go --path=/home/s2ar/Pictures/TEST --step=2
 func main() {
 
 	flag.StringVar(&path, "path", path, "директория для сканирования")
@@ -38,7 +42,7 @@ func main() {
 
 	if _, err := os.Stat(path); err == nil || os.IsExist(err) {
 	} else {
-		check(err)
+		check(errors.Wrap(err, "Bad input path"))
 	}
 
 	if _, err := os.Stat(ignoredFile); err == nil || os.IsExist(err) {
@@ -46,22 +50,15 @@ func main() {
 		check(err)
 	}
 
+	// перед проходом по директории, восстановим мапу с файла
 	uploadedFiles, err := readSuccessedFromFile()
 	check(err)
 
 	out := os.Stdout
 
-	// перед проходом по директории, восстановим мапу с файла
-	err = dirTree(out, path, uploadedFiles, &limit, step)
-	check(err)
-
-}
-
-func dirTree(out io.Writer, path string, uploadedFiles map[string]string, limit *int, step int) error {
 	pathAbs, err := filepath.Abs(path)
 	check(err)
-	recDirTree(out, pathAbs, 0, uploadedFiles, limit, step)
-	return nil
+	recDirTree(out, pathAbs, 0, uploadedFiles, &limit, step)
 }
 
 func recDirTree(out io.Writer, path string, lvl int, uploadedFiles map[string]string, limit *int, step int) {
@@ -195,8 +192,22 @@ func readSuccessedFromFile() (map[string]string, error) {
 }
 
 func check(e error) {
+	// @TODO use stackTracer
+	/*
+		type  interface {
+			StackTrace() errors.StackTrace
+		}
+
+		err, ok := e.Cause(fn()).(stackTracer)
+		if !ok {
+			panic("oops, err does not implement stackTracer")
+		}
+
+		st := err.StackTrace()
+		fmt.Printf("%+v", st[0:2]) // top two frames
+	*/
 	if e != nil {
-		panic(e)
+		log.Fatal(e)
 	}
 }
 
