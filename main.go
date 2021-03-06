@@ -42,22 +42,20 @@ func main() {
 
 	if _, err := os.Stat(path); err == nil || os.IsExist(err) {
 	} else {
-		check(errors.Wrap(err, "Bad input path"))
+		handleError(errors.Wrap(err, "Invalid directory path"))
 	}
-
 	if _, err := os.Stat(ignoredFile); err == nil || os.IsExist(err) {
 		err := os.Remove(ignoredFile)
-		check(err)
+		handleError(errors.Wrap(err, "File not deleted"))
 	}
-
 	// перед проходом по директории, восстановим мапу с файла
 	uploadedFiles, err := readSuccessedFromFile()
-	check(err)
+	handleError(errors.Wrap(err, "Var uploadedFiles not created"))
 
 	out := os.Stdout
 
 	pathAbs, err := filepath.Abs(path)
-	check(err)
+	handleError(errors.Wrap(err, "No absolute path representation created"))
 	recDirTree(out, pathAbs, 0, uploadedFiles, &limit, step)
 }
 
@@ -65,15 +63,17 @@ func recDirTree(out io.Writer, path string, lvl int, uploadedFiles map[string]st
 
 	var size int64
 	var pathList []string
-	var pathListErr error
+	var err error
 	var availableExt = []string{".png", ".JPG", ".jpg"}
 
 	lvl++
-	hPath, _ := os.Open(path)
-	fInfo, _ := hPath.Stat()
+	hPath, err := os.Open(path)
+	handleError(errors.Wrapf(err, "Did not open directory %s", path))
+	fInfo, err := hPath.Stat()
+	handleError(errors.Wrapf(err, "Did not create FileInfo structure %s", path))
 	if fInfo.IsDir() {
-		pathList, pathListErr = hPath.Readdirnames(1000)
-		check(pathListErr)
+		pathList, err = hPath.Readdirnames(1000)
+		handleError(errors.Wrapf(err, "Did not read directory %s", path))
 
 		sort.Strings(pathList)
 	}
@@ -81,8 +81,10 @@ func recDirTree(out io.Writer, path string, lvl int, uploadedFiles map[string]st
 	for index := range pathList {
 
 		absolutePath := filepath.Join(path, pathList[index])
-		hPathFile, _ := os.Open(absolutePath)
-		fInfoFile, _ := hPathFile.Stat()
+		hPathFile, err := os.Open(absolutePath)
+		handleError(errors.Wrapf(err, "Did not open file %s", absolutePath))
+		fInfoFile, err := hPathFile.Stat()
+		handleError(errors.Wrapf(err, "Did not create FileInfo structure %s", absolutePath))
 
 		if !fInfoFile.IsDir() {
 			size = fInfoFile.Size()
@@ -138,22 +140,24 @@ func isContains(a []string, x string) bool {
 func saveIgnoredExtToFile(ignoredPath string) {
 
 	f, err := os.OpenFile(ignoredFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
-	check(err)
+	handleError(errors.Wrapf(err, "Did not open file %s", ignoredPath))
 	defer f.Close()
 
 	datawriter := bufio.NewWriter(f)
-	_, _ = datawriter.WriteString(ignoredPath + "\n")
+	_, err = datawriter.WriteString(ignoredPath + "\n")
+	handleError(errors.Wrapf(err, "Did not write file %s", ignoredPath))
 	datawriter.Flush()
 }
 
 func saveSuccessedToFile(key string, successedPath string) {
 	f, err := os.OpenFile(successedFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
-	check(err)
+	handleError(errors.Wrapf(err, "Did not open file %s", successedPath))
 	defer f.Close()
 
 	row := fmt.Sprintf(pattern, key, successedPath)
 	datawriter := bufio.NewWriter(f)
-	_, _ = datawriter.WriteString(row + "\n")
+	_, err = datawriter.WriteString(row + "\n")
+	handleError(errors.Wrapf(err, "Did not write file %s", successedPath))
 	datawriter.Flush()
 }
 
@@ -191,23 +195,9 @@ func readSuccessedFromFile() (map[string]string, error) {
 	return lines, nil
 }
 
-func check(e error) {
-	// @TODO use stackTracer
-	/*
-		type  interface {
-			StackTrace() errors.StackTrace
-		}
-
-		err, ok := e.Cause(fn()).(stackTracer)
-		if !ok {
-			panic("oops, err does not implement stackTracer")
-		}
-
-		st := err.StackTrace()
-		fmt.Printf("%+v", st[0:2]) // top two frames
-	*/
+func handleError(e error) {
 	if e != nil {
-		log.Fatal(e)
+		log.Fatalf("%+v", e)
 	}
 }
 
